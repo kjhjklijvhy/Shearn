@@ -1,0 +1,253 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String      @id @default(cuid())
+  email                 String      @unique
+  password              String
+  firstName             String?
+  lastName              String?
+  profileImage          String?
+  emailVerified         Boolean     @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+  
+  // Account Status
+  isActive              Boolean     @default(true)
+  isBlocked             Boolean     @default(false)
+  blockedReason         String?
+  
+  // KYC
+  kycVerified           Boolean     @default(false)
+  kycDocument           String?
+  
+  // Financial
+  balance               Decimal     @default(0) @db.Decimal(15, 2)
+  totalInvested         Decimal     @default(0) @db.Decimal(15, 2)
+  totalEarnings         Decimal     @default(0) @db.Decimal(15, 2)
+  referralEarnings      Decimal     @default(0) @db.Decimal(15, 2)
+  
+  // Referral
+  referralCode          String      @unique @default(cuid())
+  referredBy            String?
+  referralLink          String?
+  referralCount         Int         @default(0)
+  
+  // Withdrawal
+  withdrawalMethod      String?     // "bank" or "crypto"
+  bankAccount           String?     // Encrypted
+  cryptoAddress         String?     // Encrypted
+  cryptoType            String?     // "USDT", "BTC", "TON"
+  
+  // Preferences
+  language              String      @default("fr")
+  currency              String      @default("EUR")
+  twoFactorEnabled      Boolean     @default(false)
+  twoFactorSecret       String?     // Encrypted
+  
+  // Timestamps
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  lastLoginAt           DateTime?
+  
+  // Relations
+  investments           Investment[]
+  rechargeRequests      RechargeRequest[]
+  withdrawalRequests    WithdrawalRequest[]
+  referrals             User[]      @relation("referrer")
+  referrer              User?       @relation("referrer", fields: [referredBy], references: [id])
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  sessions              Session[]
+  
+  @@index([email])
+  @@index([referralCode])
+  @@index([referredBy])
+  @@index([isBlocked])
+}
+
+model Investment {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  amount                Decimal     @db.Decimal(15, 2)
+  rate                  Decimal     @default(0.0005) @db.Decimal(10, 6)
+  status                String      @default("pending") // "pending", "active", "completed", "cancelled"
+  isRenewed             Boolean     @default(false)
+  
+  dailyEarnings         Decimal     @default(0) @db.Decimal(15, 2)
+  totalEarnings         Decimal     @default(0) @db.Decimal(15, 2)
+  
+  startDate             DateTime    @default(now())
+  endDate               DateTime?
+  nextPayoutDate        DateTime    @default(now())
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RechargeRequest {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  transactionId         String      @unique
+  amount                Decimal     @db.Decimal(15, 2)
+  method                String      // "transcash", "neosurf", "paysafecard"
+  voucherCode           String
+  status                String      @default("pending") // "pending", "validated", "rejected"
+  rejectionReason       String?
+  
+  telegramMessageId     String?
+  telegramChatId        String?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  validatedAt           DateTime?
+  validatedBy           String?
+  
+  @@index([userId])
+  @@index([transactionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model WithdrawalRequest {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  amount                Decimal     @db.Decimal(15, 2)
+  method                String      // "bank" or crypto: "USDT", "BTC", "TON"
+  walletAddress         String?
+  status                String      @default("pending") // "pending", "approved", "rejected", "completed"
+  rejectionReason       String?
+  
+  telegramMessageId     String?
+  telegramChatId        String?
+  
+  // Verification
+  investmentAge         Int? // Days
+  referralCount         Int?
+  investmentActive      Boolean?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  approvedAt            DateTime?
+  approvedBy            String?
+  completedAt           DateTime?
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Notification {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type                  String      // "investment_accepted", "investment_rejected", etc.
+  title                 String
+  message               String
+  data                  Json?
+  isRead                Boolean     @default(false)
+  
+  createdAt             DateTime    @default(now())
+  readAt                DateTime?
+  
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+}
+
+model Session {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  token                 String      @unique
+  refreshToken          String?
+  ipAddress             String
+  userAgent             String
+  isActive              Boolean     @default(true)
+  
+  expiresAt             DateTime
+  createdAt             DateTime    @default(now())
+  lastActivityAt        DateTime    @default(now())
+  
+  @@index([userId])
+  @@index([token])
+  @@index([isActive])
+}
+
+model AuditLog {
+  id                    String      @id @default(cuid())
+  userId                String?
+  user                  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  action                String
+  resource              String
+  resourceId            String?
+  changes               Json?
+  ipAddress             String?
+  userAgent             String?
+  
+  createdAt             DateTime    @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+}
+
+model AdminSettings {
+  id                    String      @id @default(cuid())
+  
+  dailyReturnRate       Decimal     @default(0.0005) @db.Decimal(10, 6)
+  minInvestment         Decimal     @default(100) @db.Decimal(15, 2)
+  maxInvestment         Decimal     @default(200) @db.Decimal(15, 2)
+  minReferralsRequired  Int         @default(20)
+  minInvestmentAgeDays  Int         @default(30)
+  referralBonus         Decimal     @default(1) @db.Decimal(15, 2)
+  
+  maintenanceMode       Boolean     @default(false)
+  maintenanceMessage    String?
+  investmentsDisabled   Boolean     @default(false)
+  withdrawalsDisabled   Boolean     @default(false)
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+}
+
+model Announcement {
+  id                    String      @id @default(cuid())
+  title                 String
+  titleEn               String?
+  content               String      @db.Text
+  contentEn             String?     @db.Text
+  type                 String      @default("info") // "info", "warning", "success"
+  isActive              Boolean     @default(true)
+  priority              Int         @default(0)
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  expiresAt             DateTime?
+  
+  @@index([isActive])
+  @@index([priority])
+}
