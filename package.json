@@ -1,0 +1,26 @@
+{
+  "name": "shearn",
+  "version": "1.0.0",
+  "description": "Plateforme d'investissement sécurisée Shearn",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend & npm run dev --workspace=backend",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "test": "npm run test --workspace=frontend && npm run test --workspace=backend",
+    "lint": "npm run lint --workspace=frontend && npm run lint --workspace=backend",
+    "format": "npm run format --workspace=frontend && npm run format --workspace=backend"
+  },
+  "keywords": [
+    "investment",
+    "platform",
+    "referral",
+    "secure",
+    "finance"
+  ],
+  "author": "Shearn Team",
+  "license": "PROPRIETARY"
+}
